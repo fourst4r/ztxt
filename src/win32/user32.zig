@@ -74,8 +74,22 @@ pub const ES_READONLY = 0x0800;
 pub const ES_WANTRETURN = 0x1000;
 pub const ES_NUMBER = 0x2000;
 
-// https://docs.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-showwindow
-pub const SW_SHOWNORMAL = 1;
+// ShowWindow() Commands
+pub const SW_HIDE =             0;
+pub const SW_SHOWNORMAL =       1;
+pub const SW_NORMAL =           1;
+pub const SW_SHOWMINIMIZED =    2;
+pub const SW_SHOWMAXIMIZED =    3;
+pub const SW_MAXIMIZE =         3;
+pub const SW_SHOWNOACTIVATE =   4;
+pub const SW_SHOW =             5;
+pub const SW_MINIMIZE =         6;
+pub const SW_SHOWMINNOACTIVE =  7;
+pub const SW_SHOWNA =           8;
+pub const SW_RESTORE =          9;
+pub const SW_SHOWDEFAULT =      10;
+pub const SW_FORCEMINIMIZE =    11;
+pub const SW_MAX =              11;
 
 pub const DialogResult = extern enum {
     ABORT = 3,
