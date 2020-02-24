@@ -30,34 +30,13 @@ pub const CF_NOSCRIPTSEL            = 0x00800000;
 pub const CF_NOVERTFONTS            = 0x01000000;
 pub const CF_INACTIVEFONTS          = 0x02000000;
 
-// Logical Font
-pub const LF_FACESIZE        = 32;
-
-pub const LOGFONTA = extern struct {
-  lfHeight: LONG,
-  lfWidth: LONG,
-  lfEscapement: LONG,
-  lfOrientation: LONG,
-  lfWeight: LONG,
-  lfItalic: BYTE,
-  lfUnderline: BYTE,
-  lfStrikeOut: BYTE,
-  lfCharSet: BYTE,
-  lfOutPrecision: BYTE,
-  lfClipPrecision: BYTE,
-  lfQuality: BYTE,
-  lfPitchAndFamily: BYTE,
-  lfFaceName: [LF_FACESIZE]CHAR,
-};
-pub const LPLOGFONTA = *LOGFONTA;
-
 pub const LPCFHOOKPROC = extern fn (Arg1: HWND, Arg2: UINT, Arg3: WPARAM, Arg4: LPARAM) callconv(.Stdcall) UINT_PTR;
 
 pub const CHOOSEFONTA = extern struct {
             lStructSize: DWORD,
              hwndOwner: HWND,
               hDC: HDC,
-       lpLogFont: LPLOGFONTA,
+       lpLogFont: @import("gdi32.zig").LPLOGFONTA,
               iPointSize: INT,
             Flags: DWORD,
          rgbColors: COLORREF,

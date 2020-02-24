@@ -9,6 +9,7 @@ const debug = std.debug;
 usingnamespace @import("win32.zig");
 usingnamespace user32;
 usingnamespace comdlg32;
+usingnamespace gdi32;
 
 const IDC_MAIN_EDIT = 101;
 
@@ -147,9 +148,12 @@ pub fn MainProc(hWnd: HWND, uMsg: UINT, wParam: WPARAM, lParam: LPARAM) callconv
                 ID_EXIT_ITEM => assert(PostMessageA(hWnd, WM_CLOSE, 0, 0) != 0),
                 // Format
                 ID_FONT_ITEM => {
-                    var default_font = GetStockObject(DEFAULT_GUI_FONT);
+                    // var default_font = GetStockObject(DEFAULT_GUI_FONT);
+                    // var ncm = mem.zeroes(NONCLIENTMETRICSA);
+                    // assert(SystemParametersInfoA(SPI_GETNONCLIENTMETRICS, 0, &ncm, 0) != 0);
+
                     var lf = mem.zeroes(LOGFONTA);
-                    GetObject(default_font, @sizeOf(LOGFONTA), &lf);
+                    // GetObject(default_font, @sizeOf(LOGFONTA), &lf);
 
                     var cf = mem.zeroes(CHOOSEFONTA);
                     cf.lStructSize = @sizeOf(CHOOSEFONTA);
@@ -159,6 +163,7 @@ pub fn MainProc(hWnd: HWND, uMsg: UINT, wParam: WPARAM, lParam: LPARAM) callconv
                     cf.rgbColors = RGB(0, 0, 0);
 
                     if (ChooseFontA(&cf) != 0) {
+                        const hf = CreateFontIndirectA(&lf);
 
                     } else {
 
