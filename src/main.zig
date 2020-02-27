@@ -23,7 +23,7 @@ const ID_SELECT_REPORT_ITEM = 1007;
 
 const app_name = "ztxt";
 const title_fmt = "{} - " ++ app_name;
-const def_window_title = "[Untitled] - " ++ app_name;
+const default_window_title = "[Untitled] - " ++ app_name;
 const max_edit_chars = 32767;
 
 var allocator: *Allocator = undefined;
@@ -31,6 +31,13 @@ var allocator: *Allocator = undefined;
 const max_title_len = max_file_path_len + title_fmt.len;
 const max_file_path_len = MAX_PATH - 1;
 var open_file_path = [_:0]u8{0} ** max_file_path_len;
+var current_font: HFONT = undefined;
+
+fn winAssert(result: BOOL) void {
+    if (result == 0) {
+        std.debug.panic("/!\\ winAssert failed: {}", .{kernel32.GetLastError()});
+    }
+}
 
 fn errBox(hwnd: ?HWND, err: anyerror) void {
     var buf = [_:0]u8{0} ** 64;
@@ -42,7 +49,7 @@ fn updateOpenFile(hwnd: HWND, file_path: []const u8) !void {
     mem.copy(u8, open_file_path[0..], file_path);
     var buf = [_:0]u8{0} ** max_title_len;
     _ = try fmt.bufPrint(&buf, title_fmt, .{file_path});
-    assert(SetWindowTextA(hwnd, &buf) != 0);
+    winAssert(SetWindowTextA(hwnd, &buf));
 }
 
 fn openFile(hwnd: HWND, file_path: []const u8) !void {
@@ -54,7 +61,7 @@ fn openFile(hwnd: HWND, file_path: []const u8) !void {
 
     try updateOpenFile(hwnd, file_path);
 
-    assert(SetDlgItemTextA(hwnd, IDC_MAIN_EDIT, txtz) != 0);
+    winAssert(SetDlgItemTextA(hwnd, IDC_MAIN_EDIT, txtz));
 }
 
 fn saveFile(hwnd: HWND, file_path: []const u8) anyerror!void {
@@ -74,7 +81,7 @@ fn saveFile(hwnd: HWND, file_path: []const u8) anyerror!void {
     }
 
     if (fs.cwd().writeFile(file_path, buf[0..recv_len])) {
-        assert(SetDlgItemTextA(hwnd, IDC_MAIN_EDIT, bufz) != 0);
+        winAssert(SetDlgItemTextA(hwnd, IDC_MAIN_EDIT, bufz));
     } else |e| {
         errBox(hwnd, e);
     }
@@ -99,13 +106,33 @@ pub fn MainProc(hWnd: HWND, uMsg: UINT, wParam: WPARAM, lParam: LPARAM) callconv
         WM_CREATE => {
             const style = WS_CHILD | WS_VISIBLE | WS_VSCROLL | WS_HSCROLL | ES_MULTILINE | ES_AUTOVSCROLL | ES_AUTOHSCROLL;
             const h_edit = CreateWindowExA(WS_EX_STATICEDGE, "EDIT", "", style, 0, 0, 100, 100, hWnd, @intToPtr(HMENU, IDC_MAIN_EDIT), @ptrCast(HINSTANCE, kernel32.GetModuleHandleW(null)), null).?;
+
+            const default_font = CreateFontA(
+                0, // height
+                0, // width
+                0,  // escapement
+                0,  // orientation
+                FW_NORMAL, // weight
+                FALSE, // italic
+                FALSE,  // underline
+                FALSE, // strikeout
+                DEFAULT_CHARSET, // charset
+                OUT_OUTLINE_PRECIS, // out precision
+                CLIP_DEFAULT_PRECIS, // clip precision
+                DRAFT_QUALITY, // quality
+                49, // pitch and family
+                "Consolas" // face name
+            );
+            current_font = default_font;
+            _ = SendDlgItemMessageA(hWnd, IDC_MAIN_EDIT, WM_SETFONT, @ptrToInt(current_font), TRUE);
+            // current_font = CreateFontIndirectA(default_font);
         },
         WM_PAINT => {
             var ps = mem.zeroes(PAINTSTRUCT);
             const hdc = BeginPaint(hWnd, &ps);
-            defer assert(EndPaint(hWnd, &ps) != 0);
+            defer winAssert(EndPaint(hWnd, &ps));
 
-            assert(FillRect(hdc, &ps.rcPaint, @intToPtr(HBRUSH, COLOR_WINDOW + 1)) != 0);
+            winAssert(FillRect(hdc, &ps.rcPaint, @intToPtr(HBRUSH, COLOR_WINDOW + 1)));
         },
         WM_COMMAND => {
             const lo_word = wParam & 0xFFFF;
@@ -113,8 +140,8 @@ pub fn MainProc(hWnd: HWND, uMsg: UINT, wParam: WPARAM, lParam: LPARAM) callconv
                 // File
                 ID_NEW_ITEM => {
                     open_file_path = [_:0]u8{0} ** max_file_path_len;
-                    assert(SetWindowTextA(hWnd, def_window_title) != 0);
-                    assert(SetDlgItemTextA(hWnd, IDC_MAIN_EDIT, "") != 0);
+                    winAssert(SetWindowTextA(hWnd, default_window_title));
+                    winAssert(SetDlgItemTextA(hWnd, IDC_MAIN_EDIT, ""));
                 },
                 ID_OPEN_ITEM => {
                     var file_path = [_:0]u8{0} ** max_file_path_len;
@@ -149,22 +176,49 @@ pub fn MainProc(hWnd: HWND, uMsg: UINT, wParam: WPARAM, lParam: LPARAM) callconv
                 // Format
                 ID_FONT_ITEM => {
                     // var default_font = GetStockObject(DEFAULT_GUI_FONT);
-                    // var ncm = mem.zeroes(NONCLIENTMETRICSA);
-                    // assert(SystemParametersInfoA(SPI_GETNONCLIENTMETRICS, 0, &ncm, 0) != 0);
+                    var ncm = mem.zeroes(NONCLIENTMETRICSA);
+                    ncm.cbSize = @sizeOf(NONCLIENTMETRICSA);
+                    winAssert(SystemParametersInfoA(SPI_GETNONCLIENTMETRICS, @sizeOf(NONCLIENTMETRICSA), &ncm, 0));
 
-                    var lf = mem.zeroes(LOGFONTA);
-                    // GetObject(default_font, @sizeOf(LOGFONTA), &lf);
+                    // var lf = mem.zeroes(LOGFONTA);
+                    //GetObject(default_font, @sizeOf(LOGFONTA), &lf);
 
                     var cf = mem.zeroes(CHOOSEFONTA);
                     cf.lStructSize = @sizeOf(CHOOSEFONTA);
                     cf.hwndOwner = hWnd;
                     cf.Flags = CF_EFFECTS | CF_INITTOLOGFONTSTRUCT | CF_SCREENFONTS;
-                    cf.lpLogFont = &lf;
+                    cf.lpLogFont = &ncm.lfMessageFont;
                     cf.rgbColors = RGB(0, 0, 0);
 
                     if (ChooseFontA(&cf) != 0) {
-                        const hf = CreateFontIndirectA(&lf);
-
+                        //   lfHeight: LONG,
+                        //   lfWidth: LONG,
+                        //   lfEscapement: LONG,
+                        //   lfOrientation: LONG,
+                        //   lfWeight: LONG,
+                        //   lfItalic: BYTE,
+                        //   lfUnderline: BYTE,
+                        //   lfStrikeOut: BYTE,
+                        //   lfCharSet: BYTE,
+                        //   lfOutPrecision: BYTE,
+                        //   lfClipPrecision: BYTE,
+                        //   lfQuality: BYTE,
+                        //   lfPitchAndFamily: BYTE,
+                        //   lfFaceName: [LF_FACESIZE-1:0]CHAR,
+                        debug.warn("{},{},{},{},{},{},{},{}\n", .{
+                            cf.lpLogFont.lfHeight,
+                            cf.lpLogFont.lfWidth,
+                            cf.lpLogFont.lfEscapement,
+                            cf.lpLogFont.lfOrientation,
+                            cf.lpLogFont.lfWeight,
+                            cf.lpLogFont.lfQuality,
+                            cf.lpLogFont.lfPitchAndFamily,
+                            cf.lpLogFont.lfFaceName,
+                            });
+                        winAssert(DeleteObject(current_font));
+                        current_font = CreateFontIndirectA(cf.lpLogFont).?;
+                        _ = SendDlgItemMessageA(hWnd, IDC_MAIN_EDIT, WM_SETFONT, @ptrToInt(current_font), TRUE);
+                        // SelectObject(h_edit, current_font);
                     } else {
 
                     }
@@ -174,34 +228,54 @@ pub fn MainProc(hWnd: HWND, uMsg: UINT, wParam: WPARAM, lParam: LPARAM) callconv
         },
         WM_SIZE => {
             var rc_client = mem.zeroes(RECT);
-            assert(GetClientRect(hWnd, &rc_client) != 0);
+            winAssert(GetClientRect(hWnd, &rc_client));
 
             if (GetDlgItem(hWnd, IDC_MAIN_EDIT)) |h_edit| {
-                assert(SetWindowPos(h_edit, HWND_TOP, 0, 0, rc_client.right, rc_client.bottom, SWP_NOZORDER) != 0);
+                winAssert(SetWindowPos(h_edit, HWND_TOP, 0, 0, rc_client.right, rc_client.bottom, SWP_NOZORDER));
             }
         },
-        WM_CLOSE => assert(DestroyWindow(hWnd) != 0),
-        WM_DESTROY => PostQuitMessage(0),
+        WM_CLOSE => {
+            winAssert(DeleteObject(current_font));
+            winAssert(DestroyWindow(hWnd));
+        },
+        WM_DESTROY => {
+            saveSettings();
+            PostQuitMessage(0);
+        },
         else => return DefWindowProcA(hWnd, uMsg, wParam, lParam),
     }
     return null;
+}
+
+fn loadSettings() void {
+
+}
+
+fn saveSettings() void {
+    var hkey: HKEY = undefined;
+    const key_exists = (0 == RegCreateKeyExA(HKEY_CURRENT_USER, registry_key, &hkey));
+    if (key_exists) {
+
+    } else {
+
+    }
 }
 
 fn createMenu() HMENU {
     const h_menu = CreateMenu();
     var h_submenu = CreatePopupMenu();
 
-    assert(AppendMenuA(h_submenu, MF_STRING, ID_NEW_ITEM, "&New") != 0);
-    assert(AppendMenuA(h_submenu, MF_STRING, ID_OPEN_ITEM, "&Open...") != 0);
-    assert(AppendMenuA(h_submenu, MF_STRING, ID_SAVE_ITEM, "&Save") != 0);
-    assert(AppendMenuA(h_submenu, MF_STRING, ID_SAVE_AS_ITEM, "Save &As...") != 0);
-    assert(AppendMenuA(h_submenu, MF_SEPARATOR, 0, "") != 0);
-    assert(AppendMenuA(h_submenu, MF_STRING, ID_EXIT_ITEM, "&Exit") != 0);
-    assert(AppendMenuA(h_menu, MF_STRING | MF_POPUP, @ptrToInt(h_submenu), "&File") != 0);
+    winAssert(AppendMenuA(h_submenu, MF_STRING, ID_NEW_ITEM, "&New"));
+    winAssert(AppendMenuA(h_submenu, MF_STRING, ID_OPEN_ITEM, "&Open..."));
+    winAssert(AppendMenuA(h_submenu, MF_STRING, ID_SAVE_ITEM, "&Save"));
+    winAssert(AppendMenuA(h_submenu, MF_STRING, ID_SAVE_AS_ITEM, "Save &As..."));
+    winAssert(AppendMenuA(h_submenu, MF_SEPARATOR, 0, ""));
+    winAssert(AppendMenuA(h_submenu, MF_STRING, ID_EXIT_ITEM, "E&xit"));
+    winAssert(AppendMenuA(h_menu, MF_STRING | MF_POPUP, @ptrToInt(h_submenu), "&File"));
 
     h_submenu = CreatePopupMenu();
-    assert(AppendMenuA(h_submenu, MF_STRING, ID_FONT_ITEM, "&Font") != 0);
-    assert(AppendMenuA(h_menu, MF_STRING | MF_POPUP, @ptrToInt(h_submenu), "F&ormat") != 0);
+    winAssert(AppendMenuA(h_submenu, MF_STRING, ID_FONT_ITEM, "&Font..."));
+    winAssert(AppendMenuA(h_menu, MF_STRING | MF_POPUP, @ptrToInt(h_submenu), "F&ormat"));
 
     return h_menu;
 }
@@ -221,13 +295,13 @@ pub fn main() void {
     wc.lpfnWndProc = MainProc;
     wc.hInstance = hInstance;
     wc.lpszClassName = app_name;
-    assert(RegisterClassA(&wc) != 0);
+    winAssert(RegisterClassA(&wc));
 
     // Create the window
     const hwnd = CreateWindowExA(
         0, // Optional window styles.
         app_name, // Window class
-        def_window_title, // Window text
+        default_window_title, // Window text
         WS_OVERLAPPEDWINDOW, // Window style
         // Size and position
         @bitCast(c_int, CW_USEDEFAULT), // X
@@ -241,7 +315,7 @@ pub fn main() void {
     ).?;
 
     _ = ShowWindow(hwnd, nShowCmd);
-    assert(UpdateWindow(hwnd) != 0);
+    winAssert(UpdateWindow(hwnd));
 
     // Message loop...
     var msg = mem.zeroes(MSG);
