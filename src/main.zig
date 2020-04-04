@@ -148,7 +148,7 @@ pub fn MainProc(hWnd: HWND, uMsg: UINT, wParam: WPARAM, lParam: LPARAM) callconv
                     var ofn = MyOPENFILENAMEA(hWnd, &file_path);
 
                     if (GetOpenFileNameA(&ofn) != 0) {
-                        openFile(hWnd, mem.toSliceConst(u8, &file_path)) catch |e| errBox(hWnd, e);
+                        openFile(hWnd, mem.spanZ(&file_path)) catch |e| errBox(hWnd, e);
                     } else {
                         // figure out whether they pressed CANCEL or we had an error
                     }
@@ -159,17 +159,17 @@ pub fn MainProc(hWnd: HWND, uMsg: UINT, wParam: WPARAM, lParam: LPARAM) callconv
                     var ofn = MyOPENFILENAMEA(hWnd, &file_path);
 
                     if (GetSaveFileNameA(&ofn) != 0) {
-                        saveFile(hWnd, mem.toSliceConst(u8, &file_path)) catch |e| errBox(hWnd, e);
+                        saveFile(hWnd, mem.spanZ(&file_path)) catch |e| errBox(hWnd, e);
                     } else {
                         // figure out whether they pressed CANCEL or we had an error
                     }
                 },
                 ID_SAVE_ITEM => {
-                    const is_untitled = (mem.len(u8, &open_file_path) == 0);
+                    const is_untitled = (mem.len(&open_file_path) == 0);
                     if (is_untitled) {
                         assert(PostMessageA(hWnd, WM_COMMAND, ID_SAVE_AS_ITEM, 0) != 0);
                     } else {
-                        saveFile(hWnd, mem.toSliceConst(u8, &open_file_path)) catch |e| errBox(hWnd, e);
+                        saveFile(hWnd, mem.spanZ(&open_file_path)) catch |e| errBox(hWnd, e);
                     }
                 },
                 ID_EXIT_ITEM => assert(PostMessageA(hWnd, WM_CLOSE, 0, 0) != 0),
@@ -253,12 +253,12 @@ fn loadSettings() void {
 
 fn saveSettings() void {
     var hkey: HKEY = undefined;
-    const key_exists = (0 == RegCreateKeyExA(HKEY_CURRENT_USER, registry_key, &hkey));
-    if (key_exists) {
+    //const key_exists = (0 == RegCreateKeyExA(HKEY_CURRENT_USER, //registry_key, &hkey));
+    //if (key_exists) {
 
-    } else {
+    //} else {
 
-    }
+    //}
 }
 
 fn createMenu() HMENU {
